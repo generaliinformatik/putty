@@ -353,11 +353,12 @@ void keylist_update(void)
     }
 }
 
-static void win_add_keyfile(Filename *filename)
+static int win_add_keyfile(Filename *filename)
 {
     char *err;
     int ret;
     char *passphrase = NULL;
+    int result = 0;
 
     /*
      * Try loading the key without a passphrase. (Or rather, without a
@@ -385,8 +386,10 @@ static void win_add_keyfile(Filename *filename)
                                 NULL, PassphraseProc, (LPARAM) &pps);
         passphrase_box = NULL;
 
-        if (!dlgret)
-            goto done;                 /* operation cancelled */
+        if (!dlgret) {
+            result = 1;                /* operation cancelled */
+            goto done;
+        }
 
         sfree(err);
 
@@ -407,13 +410,14 @@ static void win_add_keyfile(Filename *filename)
   error:
     message_box(err, APPNAME, MB_OK | MB_ICONERROR,
                 HELPCTXID(errors_cantloadkey));
+    result = 1;
   done:
     if (passphrase) {
         smemclr(passphrase, strlen(passphrase));
         sfree(passphrase);
     }
     sfree(err);
-    return;
+    return result;
 }
 
 /*
@@ -1138,7 +1142,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     WNDCLASS wndclass;
     MSG msg;
     const char *command = NULL;
-    bool added_keys = false;
+    bool added_keys = false; /* attempts to add keys (regardless of success!) */
+    int failed_keys = 0;     /* failed attempts to add keys */
     int argc, i;
     char **argv, **argstart;
 
@@ -1241,7 +1246,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
             break;
         } else {
             Filename *fn = filename_from_str(argv[i]);
-            win_add_keyfile(fn);
+            failed_keys += win_add_keyfile(fn);
             filename_free(fn);
             added_keys = true;
         }
@@ -1263,7 +1268,20 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
             *args++ = 0;
             while(*args && isspace(*args)) args++;
         }
-        spawn_cmd(command, args, show);
+
+        /*
+         * Add failed_keys as last argument so the called program can
+         * check if a key has been successfully added or not.
+         * (A simpler approach would be to not call the program at all,
+         * but that way the to-be-called program would never know.)
+         */
+        char args_with_failed[256];
+        if (args)
+            snprintf(args_with_failed, 256, "%s %i", args, failed_keys);
+        else
+            snprintf(args_with_failed, 256, "%i", failed_keys);
+
+        spawn_cmd(command, args_with_failed, show);
     }
 
     /*
