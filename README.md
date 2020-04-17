@@ -30,6 +30,11 @@ This modified version of `pageant.exe` will append an extra argument to the comm
    hello 0
    ```
 
+## References
+
+- [PuTTY release page](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)
+- [upstream repository](https://git.tartarus.org/?p=simon/putty.git;a=summary)
+
 ## License
 
 See the original [LICENCE](LICENCE) file.
